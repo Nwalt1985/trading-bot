@@ -185,6 +185,10 @@ export default async function init() {
         const accounts = await tradeUtil.listAccounts();
         tradingAccount =  accounts.filter(obj => obj.currency === config.tradeConfig.trade.currencyToTrade)[0];
         initalFunds = parseFloat(tradingAccount.available).toFixed(2);
+
+        if (parseFloat(tradingAccount.available) < 10) { 
+            throw new Error('Not enough funds in account');
+        };
         
         const { price: currentPrice } = await tradeUtil.productTicker(config.tradeConfig.trade.market);
         openingPrice = tradeUtil.formatPrice(parseInt(currentPrice));
