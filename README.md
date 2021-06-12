@@ -1,4 +1,5 @@
 # trading-bot
+https://blog.usejournal.com/a-step-by-step-guide-to-building-a-trading-bot-in-any-programming-language-d202ffe91569
 
 https://docs.pro.coinbase.com/#api
 
