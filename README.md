@@ -9,6 +9,11 @@ https://public.sandbox.pro.coinbase.com/trade/BTC-USD
   - npm run ticker
   - npm run trade
 
+# Required args
+  --market=[string]
+  --crypto=[string]
+  --currency=[string]
+
 # Help
   
   - npm run trade -- --options
