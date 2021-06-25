@@ -13,12 +13,13 @@ let profitThreshold: number = 0;
 let dipPrice: number = 0;
 let upwardTrendPrice: number = 0;
 let toBuy = true;
-let orderHistory: number[] = [];
+// let orderHistory: number[] = [];
 let tradingAccount: AccountsResponse;
 let cryptoAccount: AccountsResponse;
 let fundAmount: number = 0;
 let buyPrice: number = 0;
 let initalFunds: string;
+let profit: number = 0;
 
 const { priceRange } = config.tradeConfig.trade;
 
@@ -45,7 +46,7 @@ async function getPrices(price: number) {
     console.log(`Initial funds: ${initalFunds}`);
     console.log(`${config.tradeConfig.trade.currencyToTrade} Remaining: ${parseFloat(tradingAccount.available).toFixed(2)}`);
     console.log(`${config.tradeConfig.trade.cryptoToTrade} To Trade: ${cryptoAccount.available}`);
-    console.log(`Purchase Amount: ${fundAmount.toFixed(2)}`);
+    console.log(`Purchase Price: ${buyPrice}`);
     console.log(`BUY/SELL Range: ${priceRange * 2} +/- `)
     console.log(`Buy Dip Price: ${dipPrice}`);
     console.log(`Buy Trend Price: ${upwardTrendPrice}`);
@@ -119,8 +120,8 @@ async function sell(currentPrice: number) {
 async function earnings(sellPrice: number) {
     const newAmount = (await tradeUtil.getAccount(tradingAccount.id)).available;
 
-    const result = parseFloat(newAmount) - parseFloat(initalFunds);
-    orderHistory.push(result);
+    profit = parseFloat(newAmount) - parseFloat(initalFunds);
+    // orderHistory.push(profit);
 
     getPrices(sellPrice);
 }
@@ -128,10 +129,10 @@ async function earnings(sellPrice: number) {
 async function trade() {
     const { price: currentPrice } = await tradeUtil.productTicker(config.tradeConfig.trade.market);
     const formattedPrice = parseFloat(currentPrice);   
-    const total = orderHistory.reduce((a, b) => a + b, 0);
+    // const total = orderHistory.reduce((a, b) => a + b, 0);
     
     // Live logging, annoyingly has to be on one line to avoid the CLI being spammed with repeat lines
-    logUpdate(`(${config.tradeConfig.trade.isLive}) - Currency: ${config.tradeConfig.trade.market}    |   Live Price: ${(formattedPrice > buyPrice) ? chalk.greenBright(formattedPrice.toString()) : chalk.redBright(formattedPrice.toString())}   |   Total earnings: ${(total > 0) ? chalk.greenBright(total) : chalk.redBright(total)}`);
+    logUpdate(`(${config.tradeConfig.trade.isLive}) - Currency: ${config.tradeConfig.trade.market}    |   Live Price: ${(formattedPrice > buyPrice) ? chalk.greenBright(formattedPrice.toString()) : chalk.redBright(formattedPrice.toString())}   |   Total earnings: ${(profit > 0) ? chalk.greenBright(profit) : chalk.redBright(profit)}`);
 
     /**
      * If the current price is within the dip price range 
