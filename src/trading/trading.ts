@@ -2,24 +2,24 @@ import Trade from '../utils/trade';
 import config from '../../config/trading.config';
 import logUpdate from 'log-update';
 import chalk from 'chalk';
-import { AccountsResponse, OrderSide, OrdersResponse, OrderType } from '../../models/coinbaseAPI.interface';
+import { AccountsResponse, OrderSide, OrderType } from '../../models/coinbaseAPI.interface';
 import { v4 as uuidv4 } from 'uuid';
+import { Decimal } from 'decimal.js/decimal';
 
 const tradeUtil = new Trade();
 
-let openingPrice = 0;
-let stopLossPrice: number = 0;
-let profitThreshold: number = 0;
-let dipPrice: number = 0;
-let upwardTrendPrice: number = 0;
+let openingPrice: number;
+let stopLossPrice = new Decimal(0);
+let profitThreshold = new Decimal(0);
+let dipPrice = new Decimal(0);
+let upwardTrendPrice = new Decimal(0);
 let toBuy = true;
-// let orderHistory: number[] = [];
 let tradingAccount: AccountsResponse;
 let cryptoAccount: AccountsResponse;
-let fundAmount: number = 0;
+let fundAmount = new Decimal(0);
 let buyPrice: number = 0;
-let initalFunds: string;
-let profit: number = 0;
+let initalFunds = new Decimal(0);
+let profit = new Decimal(0);
 
 const { priceRange } = config.tradeConfig.trade;
 
@@ -32,11 +32,11 @@ async function getPrices(price: number) {
     const accounts = await tradeUtil.listAccounts();
     cryptoAccount = accounts.filter(obj => obj.currency === config.tradeConfig.trade.cryptoToTrade)[0];
     tradingAccount =  accounts.filter(obj => obj.currency === config.tradeConfig.trade.currencyToTrade)[0];
-    profitThreshold = tradeUtil.profitThreshold(price);
-    stopLossPrice = tradeUtil.stopLossPrice(price);
-    dipPrice = tradeUtil.dipThreshold(price);
-    upwardTrendPrice = tradeUtil.upwardTrendThreshold(price);
-    fundAmount = (parseFloat(tradingAccount.available) / 100 ) * config.tradeConfig.trade.percentOfAvailable;
+    profitThreshold = new Decimal(tradeUtil.profitThreshold(price)).toDecimalPlaces(3);
+    stopLossPrice = new Decimal(tradeUtil.stopLossPrice(price)).toDecimalPlaces(3);
+    dipPrice = new Decimal(tradeUtil.dipThreshold(price)).toDecimalPlaces(3);
+    upwardTrendPrice = new Decimal(tradeUtil.upwardTrendThreshold(price)).toDecimalPlaces(3);
+    fundAmount = new Decimal(new Decimal(tradingAccount.available).dividedBy(100)).times(config.tradeConfig.trade.percentOfAvailable);
 
     const operation = toBuy ? 'BUY' : 'SELL';
 
@@ -44,7 +44,7 @@ async function getPrices(price: number) {
 
     console.log(`Next Operation: ${operation}`);
     console.log(`Initial funds: ${initalFunds}`);
-    console.log(`${config.tradeConfig.trade.currencyToTrade} Remaining: ${parseFloat(tradingAccount.available).toFixed(2)}`);
+    console.log(`${config.tradeConfig.trade.currencyToTrade} Remaining: ${new Decimal(tradingAccount.available).toFixed(3)}`);
     console.log(`${config.tradeConfig.trade.cryptoToTrade} To Trade: ${cryptoAccount.available}`);
     console.log(`Purchase Price: ${buyPrice}`);
     console.log(`BUY/SELL Range: ${priceRange * 2} +/- `)
@@ -67,7 +67,7 @@ async function buy(currentPrice: number) {
         product_id: config.tradeConfig.trade.market,
         type: OrderType.market,
         side: OrderSide.buy,
-        funds: fundAmount.toFixed(2)
+        funds: fundAmount.toFixed(3)
     });
 
     if (!order) {
@@ -120,41 +120,39 @@ async function sell(currentPrice: number) {
 async function earnings(sellPrice: number) {
     const newAmount = (await tradeUtil.getAccount(tradingAccount.id)).available;
 
-    profit = parseFloat(newAmount) - parseFloat(initalFunds);
-    // orderHistory.push(profit);
+    profit = new Decimal(newAmount).minus(initalFunds);
 
     getPrices(sellPrice);
 }
 
 async function trade() {
     const { price: currentPrice } = await tradeUtil.productTicker(config.tradeConfig.trade.market);
-    const formattedPrice = parseFloat(currentPrice);   
-    // const total = orderHistory.reduce((a, b) => a + b, 0);
+    const formattedPrice = new Decimal(currentPrice);   
     
     // Live logging, annoyingly has to be on one line to avoid the CLI being spammed with repeat lines
-    logUpdate(`(${config.tradeConfig.trade.isLive}) - Currency: ${config.tradeConfig.trade.market}    |   Live Price: ${(formattedPrice > buyPrice) ? chalk.greenBright(formattedPrice.toString()) : chalk.redBright(formattedPrice.toString())}   |   Total earnings: ${(profit > 0) ? chalk.greenBright(profit) : chalk.redBright(profit)}`);
+    logUpdate(`(${config.tradeConfig.trade.isLive}) - Currency: ${config.tradeConfig.trade.market}    |   Live Price: ${(formattedPrice.greaterThan(buyPrice)) ? chalk.greenBright(formattedPrice.toFixed(3)) : chalk.redBright(formattedPrice.toFixed(3))}   |   Total earnings: ${(profit.greaterThan(0)) ? chalk.greenBright(profit) : chalk.redBright(profit)}`);
 
     /**
      * If the current price is within the dip price range 
      * and operation is set to true we place a BUY order
      */
     if (
-        formattedPrice >= (dipPrice - priceRange)
-        && formattedPrice <= (dipPrice + priceRange)
+        formattedPrice.greaterThanOrEqualTo(dipPrice.minus(priceRange))
+        && formattedPrice.lessThanOrEqualTo(dipPrice.plus(priceRange))
         && toBuy
     ) {
-        buy(formattedPrice);
+        buy(formattedPrice.toNumber());
 
     /**
      * If the current price is within the upward trend price range
      * and operation is set to true we place a BUY order
      */
     } else if (
-        formattedPrice >= (upwardTrendPrice - priceRange) 
-        && formattedPrice <= (upwardTrendPrice + priceRange)
+        formattedPrice.greaterThanOrEqualTo(upwardTrendPrice.minus(priceRange)) 
+        && formattedPrice.lessThanOrEqualTo(upwardTrendPrice.plus(priceRange))
         && toBuy
     ) {
-        buy(formattedPrice);
+        buy(formattedPrice.toNumber());
     }
 
     /**
@@ -162,22 +160,22 @@ async function trade() {
      * and operation is set to false we place a SELL order
      */
     if (
-        formattedPrice >= (profitThreshold - priceRange) 
-        && formattedPrice <= (profitThreshold + priceRange)
+        formattedPrice.greaterThanOrEqualTo(profitThreshold.minus(priceRange)) 
+        && formattedPrice.lessThanOrEqualTo(profitThreshold.plus(priceRange))
         && !toBuy
     ) {
-        sell(formattedPrice);
+        sell(formattedPrice.toNumber());
 
     /**
      * If the current price is within the stop loss price range
      * and operation is set to false we place a SELL order
      */
     } else if (
-        formattedPrice >= (stopLossPrice - priceRange) 
-        && formattedPrice <= (stopLossPrice + priceRange)
+        formattedPrice.greaterThanOrEqualTo(stopLossPrice.minus(priceRange))
+        && formattedPrice.lessThanOrEqualTo(stopLossPrice.plus(priceRange))
         && !toBuy
     ) {
-        sell(formattedPrice);
+        sell(formattedPrice.toNumber());
     }
 }
 
@@ -185,14 +183,14 @@ export default async function init() {
     try {
         const accounts = await tradeUtil.listAccounts();
         tradingAccount =  accounts.filter(obj => obj.currency === config.tradeConfig.trade.currencyToTrade)[0];
-        initalFunds = parseFloat(tradingAccount.available).toFixed(2);
+        initalFunds = new Decimal(tradingAccount.available).toDecimalPlaces(3);
 
-        if (parseFloat(tradingAccount.available) < 10) { 
+        if (new Decimal(tradingAccount.available).lt(5)) { 
             throw new Error('Not enough funds in account');
         };
         
         const { price: currentPrice } = await tradeUtil.productTicker(config.tradeConfig.trade.market);
-        openingPrice = tradeUtil.formatPrice(parseInt(currentPrice));
+        openingPrice = new Decimal(currentPrice).toNumber();
         
         console.clear();
         console.log(`Opening price: ${openingPrice}`);

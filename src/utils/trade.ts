@@ -2,6 +2,7 @@ import got from 'got';
 import config from '../../config/trading.config';
 import { AccountsResponse, OrderRequest, OrdersResponse, Product, ProductTicker } from '../../models/coinbaseAPI.interface';
 import buildHeaders from './apiAuth';
+import Decimal from 'decimal.js';
 
 const host = config.tradeConfig.api.host;
 
@@ -81,7 +82,9 @@ export default class Trade {
     }
 
     formatPrice(price: number) {
-        return Math.round(price * 100) / 100;
+        return new Decimal(
+            (new Decimal(price).times(100)).dividedBy(100)
+        ).toNumber();
     }
 
     /**
@@ -94,7 +97,7 @@ export default class Trade {
      */
     stopLossPrice(openingPrice: number) {
         const percentage = config.tradeConfig.trade.sell.stopLossPercent;
-        return this.formatPrice(Math.round(openingPrice - ((openingPrice / 100) * percentage)));
+        return this.formatPrice(openingPrice - ((openingPrice / 100) * percentage));
     }
 
     /**
@@ -105,7 +108,7 @@ export default class Trade {
      */
     profitThreshold(openingPrice: number) {
         const percentage = config.tradeConfig.trade.sell.profitThreshold;
-        return this.formatPrice(Math.round(((openingPrice / 100) * percentage) + openingPrice));
+        return this.formatPrice(((openingPrice / 100) * percentage) + openingPrice);
     }
 
     /**
@@ -118,7 +121,7 @@ export default class Trade {
      */
     dipThreshold(openingPrice: number) {
         const percentage = config.tradeConfig.trade.buy.dipThreshold;
-        return this.formatPrice(Math.round(openingPrice - ((openingPrice / 100) * percentage)));
+        return this.formatPrice(openingPrice - ((openingPrice / 100) * percentage));
     }
 
     /**
@@ -130,7 +133,7 @@ export default class Trade {
      */
     upwardTrendThreshold(openingPrice: number) {
         const percentage = config.tradeConfig.trade.buy.upwardTrendThreshold;
-        return this.formatPrice(Math.round(((openingPrice / 100) * percentage) + openingPrice));
+        return this.formatPrice(((openingPrice / 100) * percentage) + openingPrice);
     }
 
     
